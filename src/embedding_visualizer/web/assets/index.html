@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Embedding Visualizer</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23127979'/%3E%3Ccircle cx='10' cy='12' r='3' fill='white'/%3E%3Ccircle cx='22' cy='10' r='2' fill='white'/%3E%3Ccircle cx='18' cy='22' r='4' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script src="/assets/plotly.min.js" defer></script>
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+<div id="app" class="app">
+  <header class="topbar">
+    <button id="toggle-sidebar" class="icon-button" title="Настройки и данные" aria-label="Настройки и данные" aria-expanded="true">☰</button>
+    <div class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="dataset-heading"><strong id="dataset-name">Embedding Visualizer</strong><span id="dataset-meta">Локальное исследование</span></div>
+    <div class="search-wrap">
+      <span class="search-icon" aria-hidden="true">⌕</span>
+      <input id="search" type="search" placeholder="Найти ID или название…" autocomplete="off" aria-label="Поиск объекта" aria-controls="search-results" disabled>
+      <div id="search-results" class="search-results" role="listbox" hidden></div>
+    </div>
+    <div class="top-actions">
+      <button id="save-study" class="quiet-button" title="Сохранить исследование вместе с координатами" disabled><span aria-hidden="true">↓</span><span class="action-label">Сохранить</span></button>
+      <button id="open-study" class="quiet-button" title="Открыть сохранённое исследование"><span aria-hidden="true">↥</span><span class="action-label">Открыть</span></button>
+      <div class="menu-wrap"><button id="export-toggle" class="quiet-button" title="Экспорт объектов" aria-expanded="false" disabled><span aria-hidden="true">↗</span><span class="action-label">Экспорт</span></button>
+        <div id="export-menu" class="popover export-menu" hidden>
+          <label>Объекты<select id="export-scope"><option value="selected">Выделенные</option><option value="slice">Текущий срез</option><option value="all">Весь набор</option></select></label>
+          <label>Формат<select id="export-format"><option value="csv">CSV</option><option value="parquet">Parquet</option></select></label>
+          <button id="export-download" class="primary-button">Скачать</button>
+        </div>
+      </div>
+      <button id="toggle-theme" class="icon-button" title="Светлая тема" aria-label="Светлая тема">☀</button>
+      <button id="toggle-inspector" class="icon-button" title="Карточка и соседи" aria-label="Карточка и соседи" aria-expanded="true">◧</button>
+    </div>
+    <input id="study-file" type="file" accept=".npz" hidden>
+  </header>
+
+  <main class="workspace">
+    <aside id="sidebar" class="sidebar panel" aria-label="Настройки исследования">
+      <div class="panel-heading"><span>Исследование</span><button class="icon-button mobile-only" data-close="sidebar" aria-label="Закрыть настройки">×</button></div>
+      <details class="control-section" open>
+        <summary>Данные<span id="dataset-dot" class="status-dot"></span></summary>
+        <div class="section-body">
+          <label id="dataset-list-label" hidden>Локальные наборы<select id="dataset-list"></select></label>
+          <label>Путь к набору<input id="dataset-path" type="text" placeholder="~/data/embeddings" autocomplete="off" spellcheck="false"></label>
+          <button id="load-dataset" class="primary-button wide">Открыть набор</button>
+          <p class="hint">Папка с Parquet и manifest.json</p>
+          <label class="check-label"><input id="normalize" type="checkbox" disabled><span>L2-нормализация</span></label>
+          <p class="hint">Изменение сбросит проекцию и кластеры.</p>
+          <div id="dataset-warning" class="inline-notice" hidden></div>
+        </div>
+      </details>
+
+      <details class="control-section">
+        <summary>Импорт из YT</summary>
+        <form id="yt-form" class="section-body">
+          <p id="yt-unavailable" class="hint" hidden>Для импорта установите YT-клиент в окружение тулы: <code>pip install ytsaurus-client</code>.</p>
+          <label>Прокси<input id="yt-proxy" type="text" placeholder="your-cluster" autocomplete="off"></label>
+          <label>Таблица<input id="yt-table" type="text" placeholder="//home/…" autocomplete="off" spellcheck="false"></label>
+          <label>Локальный снимок<input id="yt-output" type="text" autocomplete="off" spellcheck="false"></label>
+          <div class="two-columns"><label>Строк<input id="yt-limit" type="number" min="1" value="50000" step="1"></label><label>Смещение<input id="yt-offset" type="number" min="0" value="0" step="1"></label></div>
+          <details class="yt-options"><summary>Схема и описание</summary><div class="yt-options-body">
+            <label>Название набора<input id="yt-name" type="text" value="Импорт из YT"></label>
+            <label>Пространство<input id="yt-space" type="text" value="yt/embeddings"></label>
+            <label>Версия<input id="yt-version" type="text" value="1"></label>
+            <label>Метрика<select id="yt-metric"><option value="cosine">Cosine</option><option value="euclidean">L2</option><option value="dot_product">Dot product</option></select></label>
+            <div class="two-columns"><label>Колонка ID<input id="yt-column-id" type="text" value="id"></label><label>Вектор<input id="yt-column-embedding" type="text" value="embedding"></label></div>
+            <label>Название · необязательно<input id="yt-column-name" type="text" value="name"></label>
+            <label>Метаданные · необязательно<input id="yt-column-metadata" type="text" value="metadata"></label>
+            <label>Размерность · необязательно<input id="yt-column-size" type="text" placeholder="embedding_size"></label>
+          </div></details>
+          <button id="yt-import" type="submit" class="primary-button wide">Импортировать и открыть</button>
+          <p class="hint">Используется настроенная авторизация YT. Существующий снимок не перезаписывается.</p>
+        </form>
+      </details>
+
+      <details class="control-section" open>
+        <summary>Проекция<span id="projection-badge" class="section-badge">Координаты</span></summary>
+        <form id="projection-form" class="section-body">
+          <label>Метод<select id="projection-method"><option value="raw">Исходные координаты</option><option value="pca">PCA</option><option value="umap">UMAP</option><option value="tsne">t-SNE</option></select></label>
+          <label data-projection="pca" hidden>Компоненты<input id="pca-components" type="number" min="1" value="2" step="1"></label>
+          <div class="two-columns" data-projection="umap" hidden>
+            <label>Соседи<input id="umap-neighbors" type="number" min="2" value="15" step="1"></label>
+            <label>min_dist<input id="umap-min-dist" type="number" min="0" max="1" value="0.1" step="0.05"></label>
+          </div>
+          <div class="two-columns" data-projection="tsne" hidden>
+            <label>Perplexity<input id="tsne-perplexity" type="number" min="0.1" value="30" step="any"></label>
+            <label>Итерации<input id="tsne-iterations" type="number" min="250" max="10000" value="1000" step="250"></label>
+          </div>
+          <label data-projection="umap tsne" hidden>Метрика<select id="projection-metric"><option value="euclidean">L2</option><option value="cosine">Cosine</option></select></label>
+          <label data-projection="pca umap tsne" hidden>Seed<input id="projection-seed" type="number" min="0" max="4294967295" value="42" step="1"></label>
+          <label>Область вычислений<select id="projection-scope"><option value="all">Весь набор</option><option value="slice">Текущий срез</option></select></label>
+          <button id="run-projection" type="submit" class="primary-button wide" disabled>Построить</button>
+          <p id="projection-detail" class="hint"></p>
+          <details id="projection-result" class="result-details" hidden><summary>Параметры результата</summary><p id="projection-variance" class="hint"></p><pre id="projection-parameters"></pre><p id="projection-warnings" class="hint"></p></details>
+        </form>
+      </details>
+
+      <details class="control-section">
+        <summary>Кластеризация<span id="cluster-badge" class="section-badge">Нет</span></summary>
+        <form id="cluster-form" class="section-body">
+          <label>Режим<select id="cluster-mode"><option value="manual">Ручной</option><option value="auto">Автоподбор</option></select></label>
+          <label>Метод<select id="cluster-method"><option value="kmeans">KMeans</option><option value="hdbscan">HDBSCAN</option><option value="spectral">Spectral</option><option value="agglomerative">Иерархическая</option><option value="dbscan">DBSCAN</option><option value="gaussian_mixture">Gaussian mixture</option></select></label>
+          <p id="cluster-mode-note" class="hint" hidden>DBSCAN и HDBSCAN сами определяют число кластеров. Для них доступен ручной режим.</p>
+          <label>Пространство<select id="cluster-space"><option value="original">Векторы до проекции карты</option><option value="pca">Отдельное PCA</option></select></label>
+          <label id="cluster-pca-label" hidden>Компоненты PCA<input id="cluster-pca-components" type="number" min="1" value="10" step="1"></label>
+          <label data-cluster="kmeans spectral agglomerative gaussian_mixture">Кластеры<input id="cluster-count" type="number" min="1" value="3" step="1"></label>
+          <label data-cluster="spectral" data-cluster-manual hidden>Соседи в графе<input id="spectral-neighbors" type="number" min="2" value="15" step="1"></label>
+          <label data-cluster="agglomerative" data-cluster-manual hidden>Объединение<select id="cluster-linkage"><option value="ward">Ward</option><option value="average">Average</option><option value="complete">Complete</option><option value="single">Single</option></select></label>
+          <div data-cluster="dbscan" data-cluster-manual class="two-columns" hidden><label>Радиус ε<input id="dbscan-eps" type="number" min="0.000001" value="0.5" step="any"></label><label>min_samples<input id="dbscan-samples" type="number" min="1" value="5" step="1"></label></div>
+          <label data-cluster="gaussian_mixture" data-cluster-manual hidden>Ковариация<select id="gmm-covariance"><option value="diag">Диагональная</option><option value="spherical">Сферическая</option></select></label>
+          <div data-cluster="gaussian_mixture" data-cluster-manual class="two-columns" hidden><label>Итерации<input id="gmm-iterations" type="number" min="1" max="10000" value="100" step="1"></label><label>Регуляризация<input id="gmm-regularization" type="number" min="0.000000000001" value="0.000001" step="any"></label></div>
+          <label id="cluster-seed-label">Seed<input id="cluster-seed" type="number" min="0" max="4294967295" value="42" step="1"></label>
+          <div data-cluster="hdbscan" data-cluster-manual class="two-columns" hidden>
+            <label>Мин. кластер<input id="hdbscan-size" type="number" min="2" value="5" step="1"></label>
+            <label>min_samples<input id="hdbscan-samples" type="number" min="0" value="0" step="1"></label>
+          </div>
+          <label data-cluster="hdbscan dbscan agglomerative" data-cluster-manual hidden>Метрика<select id="cluster-metric"><option value="euclidean">L2</option><option value="cosine">Cosine</option></select></label>
+          <p data-cluster="hdbscan" class="hint" hidden>min_samples = 0: размер минимального кластера.</p>
+          <p data-cluster="kmeans" class="hint">Компактные группы по расстоянию до центров.</p>
+          <p data-cluster="spectral" class="hint" hidden>Группы по графу ближайших соседей. Для сложной формы кластеров.</p>
+          <p data-cluster="agglomerative" class="hint" hidden>Последовательное объединение групп. Ward использует только L2.</p>
+          <p data-cluster="dbscan" class="hint" hidden>Группы по плотности; редкие точки помечаются как шум. ε зависит от масштаба векторов.</p>
+          <p data-cluster="gaussian_mixture" class="hint" hidden>Смесь распределений: группы могут отличаться размером и формой.</p>
+          <label data-cluster-auto hidden>Критерий<select id="cluster-objective"><option value="inertia">Внутрикластерный разброс ↓</option><option value="silhouette">Silhouette ↑</option></select></label>
+          <label data-cluster-auto hidden>Максимум вариантов<select id="cluster-budget"><option value="6">6 · быстро</option><option value="12" selected>12 · обычно</option><option value="24">24 · подробнее</option></select></label>
+          <details data-cluster-auto class="result-details tuning-help" hidden><summary>Как выбирается результат</summary><p class="hint">K и пространство фиксированы. Сравниваются варианты параметров выбранного метода в исходных векторах или отдельном PCA — проекция карты в оценке не участвует. Минимальный разброс предпочитает компактные, округлые группы и не гарантирует смысловую близость. Silhouette учитывает также разделение групп.</p></details>
+          <label>Область вычислений<select id="cluster-scope"><option value="all">Весь набор</option><option value="slice">Текущий срез</option></select></label>
+          <div class="button-row"><button id="run-cluster" type="submit" class="primary-button" disabled>Найти кластеры</button><button id="clear-clusters" type="button" class="quiet-button" title="Убрать кластеры" disabled>Сбросить</button></div>
+          <p id="cluster-detail" class="hint"></p>
+          <div id="tuning-result" class="tuning-result" hidden><p id="tuning-best" class="hint"></p><div class="button-row"><button id="show-tuning" type="button" class="quiet-button">Варианты</button><button id="tuning-to-manual" type="button" class="outline-button">В ручной режим</button></div></div>
+          <details id="cluster-result" class="result-details" hidden><summary>Параметры результата</summary><pre id="cluster-parameters"></pre><p id="cluster-warnings" class="hint"></p></details>
+        </form>
+      </details>
+
+      <details class="control-section" open>
+        <summary>Срез<span id="filter-badge" class="section-badge">Все объекты</span></summary>
+        <div class="section-body">
+          <div id="filter-list"></div>
+          <button id="add-filter" class="outline-button wide" disabled>＋ Добавить фильтр</button>
+          <div class="button-row"><button id="apply-filters" class="primary-button" disabled>Применить</button><button id="reset-filters" class="quiet-button" disabled>Сбросить</button></div>
+          <p class="hint">Фильтры скрывают точки. Для новой геометрии выберите «Текущий срез» при вычислении.</p>
+        </div>
+      </details>
+      <div class="sidebar-footer"><kbd>F</kbd> к объекту <span>·</span> <kbd>R</kbd> вся карта <span>·</span> <kbd>Esc</kbd> снять выделение</div>
+    </aside>
+
+    <section class="stage" aria-label="Карта эмбеддингов">
+      <div class="map-toolbar">
+        <div class="axis-controls"><label>X<select id="axis-x" aria-label="Ось X" disabled></select></label><label>Y<select id="axis-y" aria-label="Ось Y" disabled></select></label><span class="toolbar-separator"></span><label class="color-control">Цвет<select id="color-field" disabled><option value="">Один цвет</option></select></label><label class="point-size-control" title="Размер точек">Точки<input id="point-size" type="range" min="3" max="16" value="8" step="1" aria-label="Размер точек"><output id="point-size-value" for="point-size">8</output></label></div>
+        <div class="map-tools"><div class="segmented"><button class="tool-button active" data-mode="pan" title="Перемещение" aria-label="Перемещение">✥</button><button class="tool-button" data-mode="select" title="Выделить рамкой" aria-label="Выделить рамкой">▧</button><button class="tool-button" data-mode="lasso" title="Выделить лассо" aria-label="Выделить лассо">⌁</button></div><button id="focus-selection" class="tool-button" title="К выбранному объекту (F)" aria-label="К выбранному объекту">◎</button><button id="reset-view" class="tool-button" title="Вся карта (R)" aria-label="Вся карта">⤢</button></div>
+      </div>
+      <div class="plot-container">
+        <div id="plot" role="img" aria-label="Интерактивная карта эмбеддингов"></div>
+        <div id="empty-state" class="empty-state"><div class="empty-symbol">⠿</div><h1>Откройте пространство</h1><p>Выберите локальный набор слева.<br>Карта, срезы и соседи появятся здесь.</p><button id="empty-open" class="outline-button">Выбрать данные</button></div>
+        <div id="map-no-points" class="empty-state small" hidden><strong>В этом срезе нет точек</strong><p>Измените фильтры или область проекции.</p></div>
+        <div id="job-status" class="job-pill" role="status" hidden><span class="spinner"></span><span id="job-message">Вычисление…</span><button id="cancel-job" type="button" class="quiet-button" hidden>Отменить</button></div>
+        <div id="legend" class="map-legend" hidden></div>
+        <div class="map-footer"><span id="map-status">Локально · данные остаются на компьютере</span><button id="selection-count" class="selection-pill" title="Снять выделение" hidden></button></div>
+      </div>
+      <section id="drawer" class="drawer" aria-label="Таблицы объектов и кластеров">
+        <div class="drawer-tabs"><button data-drawer="objects" class="drawer-tab">Объекты<span id="objects-count"></span></button><button data-drawer="clusters" class="drawer-tab">Кластеры<span id="clusters-count"></span></button><button id="tuning-tab" data-drawer="tuning" class="drawer-tab" hidden>Подбор<span id="tuning-count"></span></button><span class="drawer-spacer"></span><button id="drawer-close" class="icon-button" title="Свернуть таблицу" aria-label="Свернуть таблицу" hidden>⌄</button></div>
+        <div id="drawer-content" class="drawer-content" hidden>
+          <div id="objects-panel" class="drawer-panel"><div class="table-scroll"><table><thead><tr><th class="check-cell"></th><th>ID</th><th>Название</th><th>Кластер</th><th>Метаданные</th></tr></thead><tbody id="objects-body"></tbody></table></div><div class="pager"><span id="objects-page"></span><button id="objects-prev" class="quiet-button">← Назад</button><button id="objects-next" class="quiet-button">Далее →</button></div></div>
+          <div id="clusters-panel" class="drawer-panel" hidden><div id="clusters-content" class="clusters-content"></div></div>
+          <div id="tuning-panel" class="drawer-panel" hidden><p id="tuning-context" class="hint tuning-context"></p><div class="table-scroll"><table class="tuning-table"><thead><tr><th>Вариант</th><th>Оценка</th><th>Параметры</th><th>Результат</th><th>Время</th></tr></thead><tbody id="tuning-body"></tbody></table></div></div>
+        </div>
+      </section>
+    </section>
+
+    <aside id="inspector" class="inspector panel" aria-label="Карточка объекта и соседи">
+      <div class="panel-heading"><span>Объект</span><button id="inspector-close" class="icon-button" title="Свернуть карточку" aria-label="Свернуть карточку">×</button></div>
+      <div id="inspector-empty" class="panel-empty">Выберите точку на карте<br>или найдите объект по ID.</div>
+      <div id="object-content" hidden>
+        <section class="object-card"><div class="object-id-line"><code id="object-id"></code><button id="copy-id" class="icon-button" title="Скопировать ID" aria-label="Скопировать ID">⧉</button></div><h2 id="object-name"></h2><p id="object-metrics" class="hint"></p><span id="object-cluster" class="tag" hidden></span><span id="object-outside" class="tag warning-tag" hidden>Вне текущего среза</span><details><summary>Метаданные</summary><pre id="object-metadata"></pre></details><details><summary>Вектор</summary><div class="vector-scroll"><table><thead><tr><th>№</th><th>Исходный</th><th>Вычисления</th></tr></thead><tbody id="vector-body"></tbody></table></div></details></section>
+        <section class="neighbors-section"><div class="section-title">Ближайшие соседи</div><div class="neighbor-controls"><label>Метрика<select id="neighbor-metric"><option value="cosine">Cosine</option><option value="euclidean">L2</option><option value="dot_product">Dot product</option></select></label><label class="k-control">k<input id="neighbor-k" type="number" min="1" max="1000" value="10" step="1"></label></div><label class="neighbor-scope">Искать<select id="neighbor-scope"><option value="all">Во всём наборе</option><option value="slice">В текущем срезе</option></select></label><p id="neighbor-caption" class="hint"></p><div id="neighbor-warning" class="inline-notice" hidden></div><div id="neighbors-list" class="neighbors-list"></div></section>
+      </div>
+    </aside>
+  </main>
+  <button id="panel-backdrop" class="panel-backdrop" aria-label="Закрыть панель" hidden></button>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+</div>
+</body>
+</html>

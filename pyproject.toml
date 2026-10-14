@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "embedding-visualizer"
+version = "0.2.0"
+description = "Local, dataset-agnostic embedding inspection workspace"
+readme = "README.md"
+requires-python = ">=3.11,<3.15"
+dependencies = [
+  "numpy>=2.2,<3",
+  "pyarrow>=19,<25",
+  "plotly>=6,<7",
+  "scikit-learn>=1.6,<2",
+  "umap-learn>=0.5.7,<0.6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10"]
+yt = ["ytsaurus-client"]
+
+[project.scripts]
+visualizer = "embedding_visualizer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"embedding_visualizer.web" = ["assets/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

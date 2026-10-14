@@ -1,0 +1,5 @@
+# Paths are resolved relative to this configuration file.
+data_dir = "data"
+cache_dir = ".cache"
+address = "127.0.0.1"
+port = 8501

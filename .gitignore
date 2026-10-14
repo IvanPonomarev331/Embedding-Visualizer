@@ -1,0 +1,15 @@
+/.venv/
+/.cache/
+/data/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+.DS_Store
+visualizer.local.toml
+.env
+
+# Local reports derived from private datasets.
+/docs/real-data-validation.json
